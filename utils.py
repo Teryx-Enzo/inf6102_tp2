@@ -221,7 +221,7 @@ class Mine:
         cost_for_each_timestep = []
         detailed_quantity_trace = []
         for t, quantity_pickedup in solution.mine_pov.items():
-            detailed_quantity_trace.append((level, level + self.dailyProduction, level - quantity_pickedup))
+            detailed_quantity_trace.append((level, level + self.dailyProduction, level + self.dailyProduction - quantity_pickedup))
             level += self.dailyProduction - quantity_pickedup
             validity_for_each_timestep.append(level >= 0)
             cost_for_each_timestep.append(max(level * self.inventoryCost, 0))
@@ -440,7 +440,7 @@ class Instance:
         for i, c in enumerate(zip(triples_sets,[self.mine])):
             triples,pizzeria = c
             for j in range(num_bars):
-                plt.bar([z + j * bar_width for z in index], [triple[j] for triple in triples], bar_width, label=['Avant la livraison','Après la livraison','Après la consommation'][j])
+                plt.bar([z + j * bar_width for z in index], [triple[j] for triple in triples], bar_width, label=['Avant la production','Après la production','Après la livraison'][j])
 
             plt.ylabel('Inventaire')
             plt.title(f'Inventaire - Mine {i+1}',color='black' if costandv[i][-3] else 'red')
