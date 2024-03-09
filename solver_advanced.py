@@ -1,6 +1,7 @@
 from utils import *
 import random
 import numpy as np
+from scipy.spatial.distance import cdist
 
 
 class CustomPizzeria(Pizzeria):
@@ -41,7 +42,6 @@ def clustering(Q: int, n: int, Pizzerias: Dict[int, CustomPizzeria], To_deliver:
 
     for p_id in To_deliver:
         if p_id not in Initial_pizzerias:
-            print(p_id)
             # On met les pizzerias restantes dans des clusters si c'est possible
             placed = False
 
@@ -54,12 +54,80 @@ def clustering(Q: int, n: int, Pizzerias: Dict[int, CustomPizzeria], To_deliver:
             
             if not placed:
                 return False
+    
+    Old_centers = compute_centers(Pizzerias, Clusters)
+    converged = False
 
-    converged = True
     while not converged:
-        pass
+        Clusters = update_clusters(Q, Pizzerias, Clusters, Old_centers)
+        Centers = compute_centers(Pizzerias, Clusters)
+
+        if np.allclose(Centers, Old_centers):
+            converged = True
+
+        Old_centers = Centers
 
     return Clusters
+
+
+def compute_centers(Pizzerias: Dict[int, CustomPizzeria], Clusters: Dict):
+    """
+    Calcule les centres des clusters
+
+    Args:
+        Pizzerias (List[CustomPizzeria]) : le dictionnaire des pizzerias 
+        Clusters 
+    
+    Returns:
+        Centers (List[(float, float)]) : La liste des centres des clusters
+    """
+    Centers = []
+
+    for c_id in Clusters:
+        coords = [[Pizzerias[idx].x, Pizzerias[idx].y] for idx in Clusters[c_id][0]]
+        Centers.append(np.mean(coords, axis=0))
+
+    return Centers
+
+
+def update_clusters(Q: int, Pizzerias: Dict[int, CustomPizzeria], Clusters: Dict, Centers):
+    """
+    Met à jour les clusters en assignant les pizzerias aux clusters les plus proches, si c'est possible
+
+    Args:
+        Q (int) : la capacité des camions
+        Pizzerias (List[CustomPizzeria]) : le dictionnaire des pizzerias
+        Clusters
+        Centers (List[(float, float)]) : La liste des centres des clusters
+
+    Returns:
+        Updated_clusters 
+    """
+    Updated_clusters = Clusters.copy()
+
+    pizz_coords = [[Pizzerias[idx].x, Pizzerias[idx].y] for idx in Pizzerias]
+    Distances = cdist(pizz_coords, Centers)
+
+    print(Distances)
+
+    for c_id in Updated_clusters:
+        for p_id in Updated_clusters[c_id][0].copy():
+            print(p_id)
+            if Distances[p_id-1, c_id] > min(Distances[p_id-1]):
+                # La pizzeria n'est pas dans le cluster de centre le plus proche
+                closest_center = np.argmin(Distances[p_id-1])
+
+                if Updated_clusters[closest_center][1]+Pizzerias[p_id].calculer_demande() < Q:
+                    # On rajoute la pizzeria à ce cluster
+                    Updated_clusters[closest_center][0].append(p_id)
+                    Updated_clusters[closest_center][1] += Pizzerias[p_id].calculer_demande()
+                    # On la retire de son cluster initial
+                    Updated_clusters[c_id][0].remove(p_id)
+                    Updated_clusters[c_id][1] -= Pizzerias[p_id].calculer_demande()
+                    print('update')
+    
+    return Updated_clusters
+
 
 
 def solve(instance: Instance) -> Solution:
