@@ -11,6 +11,8 @@ class CustomPizzeria(Pizzeria):
 
 
     def calculer_demande(self):
+
+        #On calcule la demande et on la renvoie si elle est positive
         demande = self.L+self.dailyConsumption-self.inventoryLevel
         
         
