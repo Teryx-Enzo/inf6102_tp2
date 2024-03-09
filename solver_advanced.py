@@ -9,6 +9,16 @@ class CustomPizzeria(Pizzeria):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+
+    def calculer_demande(self):
+
+        #On calcule la demande et on la renvoie si elle est positive
+        demande = self.L+self.dailyConsumption-self.inventoryLevel
+        
+        
+        
+        return demande if demande > 0 else 0
+
 def solve(instance: Instance) -> Solution:
     """
     This function generates a solution where at each timestep
