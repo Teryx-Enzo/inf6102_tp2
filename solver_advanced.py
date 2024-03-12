@@ -2,6 +2,8 @@ from utils import *
 import random
 import numpy as np
 from scipy.spatial.distance import cdist
+import networkx as nx
+import matplotlib.pyplot as plt
 
 
 class CustomPizzeria(Pizzeria):
@@ -12,6 +14,7 @@ class CustomPizzeria(Pizzeria):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.demande_journaliere = []
 
 
     def calculer_demande(self):
@@ -22,112 +25,139 @@ class CustomPizzeria(Pizzeria):
         return demande if demande > 0 else 0
 
 
-def clustering(Q: int, n: int, Pizzerias: Dict[int, CustomPizzeria], To_deliver: List[int]) -> Dict[int, int]:
-    """
-    Génère n ensembles de pizzerias regroupées par distance, telle que la somme de leurs demandes soit inférieure à la quantité Q transportable.
 
-    Args:
-        Q (int) : la capacité des camions
-        n (int) : le nombre de clusters souhaités
-        Pizzerias (List[CustomPizzeria]) : le dictionnaire des pizzerias 
-        To_deliver (List[int]) : la liste des indexs des pizzerias à regrouper
+def distance(point1,point2):
+    _, x1, y1 = point1
+    _, x2, y2 = point2
 
-    Returns:
-        Clusters (List[List[int]]) : une liste de n clusters d'indexs de pizzerias proches géographiquement, et dont la somme des demande n'excède pas Q.
-    """
-    Initial_pizzerias = random.sample(To_deliver, k=n) # Pizzerias avec lesquelles on initialise les clusters
+    distance = np.sqrt((x1-x2)**2+(y1-y2)**2)
 
-    Clusters = dict(zip(range(n),
-                        [[[idx], Pizzerias[idx].calculer_demande()] for idx in Initial_pizzerias]))
 
-    for p_id in To_deliver:
-        if p_id not in Initial_pizzerias:
-            # On met les pizzerias restantes dans des clusters si c'est possible
-            placed = False
+    return distance
 
-            for c_id in Clusters:
-                if Clusters[c_id][1]+Pizzerias[p_id].calculer_demande() < Q:
-                    Clusters[c_id][0].append(p_id)
-                    Clusters[c_id][1] += Pizzerias[p_id].calculer_demande()
-                    placed = True
-                    break
+
+def graph_complet(points):
+
+
+    G = nx.Graph()
+
+    for x in range(len(points)-1):
+
+        G.add_node(x)
+        G.add_edge(x,x+1,weight = distance(points[x],points[x+1]))
+
+    return G
+
+def TSP(points):
+    
+    G = graph_complet(points)
+
+    
+    min = nx.minimum_spanning_tree(G) 
+
+
+    impair_min = []
+
+    for node in min.nodes: 
+        if (min.degree(node) % 2 != 0):  
+
+            impair_min.append(node * -1)
+
+    impair = nx.complete_graph(impair_min)
+    couplage = nx.max_weight_matching(impair, maxcardinality=True)
+
+    liste_aretes = []
+
+    for i in couplage:
+        liste_aretes.append(i[0]*-1)
+        liste_aretes.append(i[1]*-1)
+
+
+    liste_ordre = []
+    IterZip = zip(*[iter(liste_aretes)] * 2)
+    for i in IterZip:
+        liste_ordre.append(i)
+    min.add_edges_from(liste_ordre)
+    
+
+    resultat = []
+    for i in nx.eulerian_circuit(min):
+        if i[0] not in resultat:
+            resultat.append(i[0])
+    
+    return resultat
+
+def solution_initiale(nos_pizzerias,N,T,M,Q):
+     
+
+    solution = np.zeros((T,M,N))
+    pizzerias = nos_pizzerias.copy()
+
+
+    for t in range(T):
+
+
+        for pizzeria in pizzerias:
+            demande_jour = pizzeria.calculer_demande()
+            pizzeria.demande_journaliere.append(demande_jour)
+        
+        
+         
+        for truck_id in range(M):
+            truck_capacity = Q
             
-            if not placed:
-                return False
-    
-    Old_centers = compute_centers(Pizzerias, Clusters)
-    converged = False
+            for pizzeria in pizzerias:
+                    if np.count_nonzero(solution[t,:,pizzeria.id-1]) == 0:
 
-    while not converged:
-        Clusters = update_clusters(Q, Pizzerias, Clusters, Old_centers)
-        Centers = compute_centers(Pizzerias, Clusters)
+                        demande = pizzeria.demande_journaliere[t]
 
-        if np.allclose(Centers, Old_centers):
-            converged = True
+                        if demande:
+                            livraison = demande if  truck_capacity > demande else 0
 
-        Old_centers = Centers
+                            if livraison :
+                                solution[t,truck_id,pizzeria.id-1] = 1
+                                print(truck_capacity,truck_id,pizzeria.id)
+                                truck_capacity -= livraison
+                                pizzeria.inventoryLevel += livraison
+                        
 
-    return Clusters
-
-
-def compute_centers(Pizzerias: Dict[int, CustomPizzeria], Clusters: Dict):
-    """
-    Calcule les centres des clusters
-
-    Args:
-        Pizzerias (List[CustomPizzeria]) : le dictionnaire des pizzerias 
-        Clusters 
-    
-    Returns:
-        Centers (List[(float, float)]) : La liste des centres des clusters
-    """
-    Centers = []
-
-    for c_id in Clusters:
-        coords = [[Pizzerias[idx].x, Pizzerias[idx].y] for idx in Clusters[c_id][0]]
-        Centers.append(np.mean(coords, axis=0))
-
-    return Centers
+                        
 
 
-def update_clusters(Q: int, Pizzerias: Dict[int, CustomPizzeria], Clusters: Dict, Centers):
-    """
-    Met à jour les clusters en assignant les pizzerias aux clusters les plus proches, si c'est possible
+        for pizzeria in pizzerias:
+             pizzeria.inventoryLevel -= pizzeria.dailyConsumption
 
-    Args:
-        Q (int) : la capacité des camions
-        Pizzerias (List[CustomPizzeria]) : le dictionnaire des pizzerias
-        Clusters
-        Centers (List[(float, float)]) : La liste des centres des clusters
+    print(solution)
+    return solution
 
-    Returns:
-        Updated_clusters 
-    """
-    Updated_clusters = Clusters.copy()
 
-    pizz_coords = [[Pizzerias[idx].x, Pizzerias[idx].y] for idx in Pizzerias]
-    Distances = cdist(pizz_coords, Centers)
+def generate_raw_solution(solution,pizzerias,M,N,T):
 
-    print(Distances)
+    raw_solution = []
 
-    for c_id in Updated_clusters:
-        for p_id in Updated_clusters[c_id][0].copy():
-            print(p_id)
-            if Distances[p_id-1, c_id] > min(Distances[p_id-1]):
-                # La pizzeria n'est pas dans le cluster de centre le plus proche
-                closest_center = np.argmin(Distances[p_id-1])
+    for t in range(T):
+        timestep =[]
+        for truck_id in range(M):
+            truck_route = []
+            truck_route_coordinate = []
 
-                if Updated_clusters[closest_center][1]+Pizzerias[p_id].calculer_demande() < Q:
-                    # On rajoute la pizzeria à ce cluster
-                    Updated_clusters[closest_center][0].append(p_id)
-                    Updated_clusters[closest_center][1] += Pizzerias[p_id].calculer_demande()
-                    # On la retire de son cluster initial
-                    Updated_clusters[c_id][0].remove(p_id)
-                    Updated_clusters[c_id][1] -= Pizzerias[p_id].calculer_demande()
-                    print('update')
-    
-    return Updated_clusters
+            for id_pizz in range(N):
 
+                if solution[t,truck_id,id_pizz]==1:
+                    truck_route.append((pizzerias[id_pizz].id,pizzerias[id_pizz].demande_journaliere[t]))
+                    truck_route_coordinate.append((id_pizz,pizzerias[id_pizz].x,pizzerias[id_pizz].y))
+
+            if len(truck_route_coordinate)>2:
+                ordered_indices = TSP(truck_route_coordinate)
+                truck_route = [truck_route[i] for i in ordered_indices]
+                
+
+            
+            timestep.append(truck_route)
+            print(truck_route)
+        raw_solution.append(timestep)
+
+    return raw_solution
 
 
 def solve(instance: Instance) -> Solution:
@@ -141,47 +171,36 @@ def solve(instance: Instance) -> Solution:
     Returns:
         Solution: the generated solution
     """
-    Q, M = instance.Q, instance.M
+    Q, M, N, T = instance.Q, instance.M, instance.npizzerias, instance.T
 
-    nos_pizzerias = {id: CustomPizzeria(p.id, p.x, p.y, p.maxInventory, p.minInventory, p.inventoryLevel, p.dailyConsumption, p.inventoryCost)
-                      for id, p in instance.pizzeria_dict.items()}
+    #nos_pizzerias = {id: CustomPizzeria(p.id, p.x, p.y, p.maxInventory, p.minInventory, p.inventoryLevel, p.dailyConsumption, p.inventoryCost) for id, p in instance.pizzeria_dict.items()}
     
-    print(clustering(Q, 2, nos_pizzerias, list(nos_pizzerias.keys())))
+    
 
     nos_pizzerias = [CustomPizzeria(p.id, p.x, p.y,  p.maxInventory, p.minInventory, p.inventoryLevel, p.dailyConsumption ,p.inventoryCost ) for _,p in list(instance.pizzeria_dict.items())]
+    
+    pizzerias = nos_pizzerias.copy()
+    random.shuffle(nos_pizzerias)
+
+    
+    sol_raw = generate_raw_solution(solution_initiale(nos_pizzerias,N,T,M,Q),pizzerias,M,N,T)
+
+    
 
 
-
-    sol_raw=[]
-    Q = instance.Q
-
-
-    for t in range(instance.T):
-        timestep=[]
-        pizzeria_a_livrer = [id 
-                             for id, pizz in nos_pizzerias.items()
-                             if pizz.calculer_demande() > 0] # liste d'indices 
-        
-        for truck_id in range(instance.M):
-            truck_capacity = Q
-            truck_route=[]
-            temp_pizz = nos_pizzerias.copy()
-            for pizzeria in nos_pizzerias:
-                    demande = pizzeria.calculer_demande()
-                    if demande:
-                        livraison = demande if  truck_capacity > demande else 0
-                        if livraison > 0:
-                            truck_route.append((pizzeria.id,livraison))
-                            truck_capacity -= livraison
-                            pizzeria.inventoryLevel += livraison
-                            temp_pizz.remove(pizzeria)
-                    else :
-                        temp_pizz.remove(pizzeria)
-            timestep.append(truck_route)
-        sol_raw.append(timestep)
-
-        for pizzeria in nos_pizzerias:
-             pizzeria.inventoryLevel -= pizzeria.dailyConsumption
+    
              
     return Solution(instance.npizzerias,sol_raw)
+
+
     
+if __name__ == "__main__":
+
+    points = [(2,0,0),(3,2,3),(4,3,2),(5,0,1),(6,5,12) ]
+
+    puntos = []
+    for i,x,y in points:
+        puntos.append((i,float(x), float(y)))
+
+
+    print(TSP(puntos))
