@@ -48,8 +48,8 @@ def graph_complet(points):
 
     return G
 
-def TSP(points):
-    
+def TSP(points,mineX,mineY):
+    points = [(-1,mineX,mineY)]+points
     G = graph_complet(points)
 
     
@@ -85,7 +85,7 @@ def TSP(points):
         if i[0] not in resultat:
             resultat.append(i[0])
     
-    return resultat
+    return resultat[1:]
 
 def solution_initiale(nos_pizzerias,N,T,M,Q):
      
@@ -116,7 +116,6 @@ def solution_initiale(nos_pizzerias,N,T,M,Q):
 
                             if livraison :
                                 solution[t,truck_id,pizzeria.id-1] = 1
-                                print(truck_capacity,truck_id,pizzeria.id)
                                 truck_capacity -= livraison
                                 pizzeria.inventoryLevel += livraison
                         
@@ -127,11 +126,10 @@ def solution_initiale(nos_pizzerias,N,T,M,Q):
         for pizzeria in pizzerias:
              pizzeria.inventoryLevel -= pizzeria.dailyConsumption
 
-    print(solution)
     return solution
 
 
-def generate_raw_solution(solution,pizzerias,M,N,T):
+def generate_raw_solution(solution,pizzerias,M,N,T,mineX,mineY):
 
     raw_solution = []
 
@@ -147,14 +145,16 @@ def generate_raw_solution(solution,pizzerias,M,N,T):
                     truck_route.append((pizzerias[id_pizz].id,pizzerias[id_pizz].demande_journaliere[t]))
                     truck_route_coordinate.append((id_pizz,pizzerias[id_pizz].x,pizzerias[id_pizz].y))
 
-            if len(truck_route_coordinate)>2:
-                ordered_indices = TSP(truck_route_coordinate)
-                truck_route = [truck_route[i] for i in ordered_indices]
+            if len(truck_route)>2:
+                print(truck_route)
+                print(truck_route_coordinate)
+                ordered_indices = TSP(truck_route_coordinate,mineX,mineY)
                 
+                truck_route = [truck_route[i-1] for i in ordered_indices]
+                print(truck_route)
 
             
             timestep.append(truck_route)
-            print(truck_route)
         raw_solution.append(timestep)
 
     return raw_solution
@@ -173,6 +173,8 @@ def solve(instance: Instance) -> Solution:
     """
     Q, M, N, T = instance.Q, instance.M, instance.npizzerias, instance.T
 
+
+    mineX, mineY = instance.mine.x, instance.mine.y
     #nos_pizzerias = {id: CustomPizzeria(p.id, p.x, p.y, p.maxInventory, p.minInventory, p.inventoryLevel, p.dailyConsumption, p.inventoryCost) for id, p in instance.pizzeria_dict.items()}
     
     
@@ -183,7 +185,7 @@ def solve(instance: Instance) -> Solution:
     random.shuffle(nos_pizzerias)
 
     
-    sol_raw = generate_raw_solution(solution_initiale(nos_pizzerias,N,T,M,Q),pizzerias,M,N,T)
+    sol_raw = generate_raw_solution(solution_initiale(nos_pizzerias,N,T,M,Q),pizzerias,M,N,T, mineX,mineY)
 
     
 
