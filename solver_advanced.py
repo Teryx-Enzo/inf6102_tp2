@@ -5,7 +5,7 @@ from scipy.spatial.distance import cdist
 import networkx as nx
 import matplotlib.pyplot as plt
 
-
+from copy import deepcopy
 class CustomPizzeria(Pizzeria):
 
     """ You are completely free to extend classes defined in utils,
@@ -35,6 +35,19 @@ def distance(point1,point2):
 
     return distance
 
+def knn(x, X, k, **kwargs):
+    """
+    find indices of k-nearest neighbors of x in X
+    """
+    d = distance.cdist(x.reshape(1,-1), X).flatten()
+    return np.argpartition(d, k)[0]
+
+# def TSP_nn(points,mineX,mineY):
+    
+#     res = []
+#     point = [mineX,mineY]
+#     for i in range(len(points)):
+#         index = 
 
 def graph_complet(points):
 
@@ -146,12 +159,12 @@ def generate_raw_solution(solution,pizzerias,M,N,T,mineX,mineY):
                     truck_route_coordinate.append((id_pizz,pizzerias[id_pizz].x,pizzerias[id_pizz].y))
 
             if len(truck_route)>2:
-                print(truck_route)
-                print(truck_route_coordinate)
+                #print(truck_route)
+                #print(truck_route_coordinate)
                 ordered_indices = TSP(truck_route_coordinate,mineX,mineY)
                 
                 truck_route = [truck_route[i-1] for i in ordered_indices]
-                print(truck_route)
+                #print(truck_route)
 
             
             timestep.append(truck_route)
@@ -182,27 +195,44 @@ def solve(instance: Instance) -> Solution:
     nos_pizzerias = [CustomPizzeria(p.id, p.x, p.y,  p.maxInventory, p.minInventory, p.inventoryLevel, p.dailyConsumption ,p.inventoryCost ) for _,p in list(instance.pizzeria_dict.items())]
     
     pizzerias = nos_pizzerias.copy()
-    random.shuffle(nos_pizzerias)
+    #random.shuffle(nos_pizzerias)
 
+    instance_copy = deepcopy(instance)
+    best_sol_raw = generate_raw_solution(solution_initiale(nos_pizzerias,N,T,M,Q),pizzerias,M,N,T, mineX,mineY)
+    best_cost,validity = instance.solution_cost_and_validity(Solution(instance.npizzerias,best_sol_raw))
     
-    sol_raw = generate_raw_solution(solution_initiale(nos_pizzerias,N,T,M,Q),pizzerias,M,N,T, mineX,mineY)
+    for _ in range(2000):
 
+        random.shuffle(nos_pizzerias)
+
+        instance_temps = deepcopy(instance_copy)
     
+        sol_raw = generate_raw_solution(solution_initiale(nos_pizzerias,N,T,M,Q),pizzerias,M,N,T, mineX,mineY)
 
+        # if sol_raw != best_sol_raw:
+        #     print('oui')
 
+        cost,validity = instance_temps.solution_cost_and_validity(Solution(instance.npizzerias,sol_raw))
+
+        if cost < best_cost:
+            print(cost)
+            best_sol_raw = sol_raw
+            best_cost = cost
     
              
-    return Solution(instance.npizzerias,sol_raw)
+    return Solution(instance.npizzerias,best_sol_raw)
 
 
     
 if __name__ == "__main__":
 
-    points = [(2,0,0),(3,2,3),(4,3,2),(5,0,1),(6,5,12) ]
+    points = [(2,0,0),(3,2,3),(4,3,2),(5,0,1),(6,5,1) ]
 
     puntos = []
     for i,x,y in points:
         puntos.append((i,float(x), float(y)))
 
-
-    print(TSP(puntos))
+    for i in range(10):
+        res = TSP(puntos,2,0)
+        print(res)
+        puntos = [puntos[i-1] for i in res]
