@@ -93,9 +93,10 @@ def solution_initiale(nos_pizzerias,N,T,M,Q):
     return solution, pizzerias
 
 
-def generate_raw_solution(solution,pizzerias,M,N,T,mineX,mineY):
+def generate_raw_solution(solution,pizzerias,M,N,T,mineX,mineY,ordre_pizze):
 
     raw_solution = []
+    
 
     for t in range(T):
         timestep =[]
@@ -103,7 +104,7 @@ def generate_raw_solution(solution,pizzerias,M,N,T,mineX,mineY):
             truck_route = []
             truck_route_coordinate = []
 
-            for id_pizz in range(N):
+            for id_pizz in ordre_pizze:
 
                 if solution[t,truck_id,id_pizz]==1:
                     truck_route.append((pizzerias[id_pizz].id,pizzerias[id_pizz].demande_journaliere[t]))
@@ -143,13 +144,16 @@ def solve(instance: Instance) -> Solution:
 
     instance_copy = deepcopy(instance)
     sol,pizz  = solution_initiale(pizzerias,N,T,M,Q)
-    best_sol_raw = generate_raw_solution(sol,pizz,M,N,T, mineX,mineY)
+    ordre_pizze = [pizzeria.id-1 for pizzeria in pizzerias]
+    best_sol_raw = generate_raw_solution(sol,pizz,M,N,T, mineX,mineY,ordre_pizze)
     best_cost,validity = instance.solution_cost_and_validity(Solution(instance.npizzerias,best_sol_raw))
     
-    for _ in range(20000):
+    for _ in range(100000):
 
         pizzerias = deepcopy(nos_pizzerias)
         random.shuffle(pizzerias)
+
+        ordre_pizze = [pizzeria.id-1 for pizzeria in pizzerias]
 
         instance_temps = deepcopy(instance_copy)
 
@@ -161,7 +165,7 @@ def solve(instance: Instance) -> Solution:
 
         for pizzeria in pizz:
             nos_pizzerias[pizzeria.id-1].demande_journaliere = pizzeria.demande_journaliere
-        sol_raw = generate_raw_solution(sol,nos_pizzerias,M,N,T, mineX,mineY)
+        sol_raw = generate_raw_solution(sol,nos_pizzerias,M,N,T, mineX,mineY,ordre_pizze)
 
         # if sol_raw != best_sol_raw:
         #     print('oui')
