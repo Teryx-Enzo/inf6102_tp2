@@ -118,6 +118,50 @@ def generate_raw_solution(solution,pizzerias,M,N,T,mineX,mineY,ordre_pizze):
     return raw_solution
 
 
+def deux_swap(pizzerias):
+    """
+    Génère une liste de voisins de la solution artpieces en échangeant pour chaque voisin 2 tableaux distincts.
+
+    Args:
+        artpieces (List): Liste d'items de dictionnaire (index, ArtPiece), solution actuelle.
+    
+    Returns:
+        deux_swap_neigh (List[List]) : Liste de voisins de artpieces.
+    """
+    n = len(pizzerias)
+    deux_swap_neigh = []
+    for i in range(n):
+        for j in range(i+1,n):
+            neigh = deepcopy(pizzerias)
+            neigh[i],neigh[j] = pizzerias[j], pizzerias[i]
+            deux_swap_neigh.append(neigh)
+
+    return deux_swap_neigh
+
+
+def metric(pizzerias,instance,N,T,M,Q,mineX,mineY,nos_pizzerias):
+    
+    instance_copy = deepcopy(instance)
+    voisin = []
+    
+    for pizzeria in pizzerias:
+                pizzeria_copy = deepcopy(nos_pizzerias[pizzeria.id-1])
+                pizzeria_copy.demande_journaliere = []
+                voisin.append(pizzeria_copy)
+
+    sol,pizz  = solution_initiale(voisin,N,T,M,Q)
+    ordre_pizze = [pizzeria.id-1 for pizzeria in voisin]
+
+    for pizzeria in pizz:
+        nos_pizzerias[pizzeria.id-1].demande_journaliere = pizzeria.demande_journaliere
+    sol_raw = generate_raw_solution(sol,nos_pizzerias,M,N,T, mineX,mineY,ordre_pizze)
+
+    
+    cost,validity = instance_copy.solution_cost_and_validity(Solution(instance_copy.npizzerias,sol_raw))
+
+
+    return cost, sol_raw
+
 def solve(instance: Instance) -> Solution:
     """
     This function generates a solution where at each timestep
@@ -140,45 +184,91 @@ def solve(instance: Instance) -> Solution:
     nos_pizzerias = [CustomPizzeria(p.id, p.x, p.y,p.inventoryLevel,  p.maxInventory, p.minInventory,  p.dailyConsumption ,p.inventoryCost ) for _,p in list(instance.pizzeria_dict.items())]
     
     pizzerias = deepcopy(nos_pizzerias)
-    #random.shuffle(nos_pizzerias)
-
     instance_copy = deepcopy(instance)
+
+
     sol,pizz  = solution_initiale(pizzerias,N,T,M,Q)
     ordre_pizze = [pizzeria.id-1 for pizzeria in pizzerias]
-    best_sol_raw = generate_raw_solution(sol,pizz,M,N,T, mineX,mineY,ordre_pizze)
-    best_cost,validity = instance.solution_cost_and_validity(Solution(instance.npizzerias,best_sol_raw))
-    
-    for _ in range(100000):
+    for pizzeria in pizz:
+        nos_pizzerias[pizzeria.id-1].demande_journaliere = pizzeria.demande_journaliere
+    best_sol_raw = generate_raw_solution(sol,nos_pizzerias,M,N,T, mineX,mineY,ordre_pizze)
+    best_cost,validity = instance_copy.solution_cost_and_validity(Solution(instance_copy.npizzerias,best_sol_raw))
 
+    for _ in range(200):
         pizzerias = deepcopy(nos_pizzerias)
         random.shuffle(pizzerias)
 
-        ordre_pizze = [pizzeria.id-1 for pizzeria in pizzerias]
+        for _ in range(5):
+            instance_temps = deepcopy(instance)
 
-        instance_temps = deepcopy(instance_copy)
+            voisin = []
 
-        for pizzeria in pizzerias:
-            pizzeria.demande_journaliere = []
-    
-        sol, pizz = solution_initiale(pizzerias,N,T,M,Q)
-        #print(pizz[2].demande_journaliere)
+            for pizzeria in pizzerias:
+                pizzeria_copy = deepcopy(nos_pizzerias[pizzeria.id-1])
+                pizzeria_copy.demande_journaliere = []
+                voisin.append(pizzeria_copy)
 
-        for pizzeria in pizz:
-            nos_pizzerias[pizzeria.id-1].demande_journaliere = pizzeria.demande_journaliere
-        sol_raw = generate_raw_solution(sol,nos_pizzerias,M,N,T, mineX,mineY,ordre_pizze)
+            
+        
+            voisins = deux_swap(voisin)
 
-        # if sol_raw != best_sol_raw:
-        #     print('oui')
+            metric_liste = [[voisin,*metric(voisin,instance,N,T,M,Q,mineX,mineY,nos_pizzerias)] for voisin in voisins]
 
-        cost,validity = instance_temps.solution_cost_and_validity(Solution(instance.npizzerias,sol_raw))
+            
+            voisins_sorted = sorted(metric_liste, key = lambda x:x[1])
 
-        if cost < best_cost:
-            print(cost)
-            best_sol_raw = sol_raw
-            best_cost = cost
-    
+            #print(voisins_sorted[0][1])
+            #print(metric(voisins_sorted[i,0],instance,N,T,M,Q,mineX,mineY,nos_pizzerias))
+            
+            if voisins_sorted[0][1] < best_cost:
+                    print(voisins_sorted[0][1])
+                    best_cost  = voisins_sorted[0][1]
+                    best_sol_raw = voisins_sorted[0][2]
+                    
+                    pizzerias = voisins_sorted[0][0]
+                    # voisin = []
+
+                    
+                    # for pizzeria in pizzerias:
+                    #     pizzeria_copy = deepcopy(nos_pizzerias[pizzeria.id-1])
+                    #     pizzeria_copy.demande_journaliere = []
+                    #     voisin.append(pizzeria_copy)
+                    # sol,pizz  = solution_initiale(voisin,N,T,M,Q)
+                    # ordre_pizze = [pizzeria.id-1 for pizzeria in voisin]
+                    # for pizzeria in pizz:
+                    #     nos_pizzerias[pizzeria.id-1].demande_journaliere = pizzeria.demande_journaliere
+                    # best_sol_raw = generate_raw_solution(sol,nos_pizzerias,M,N,T, mineX,mineY,ordre_pizze)
+                    #best_cost,validity = instance_temps.solution_cost_and_validity(Solution(instance.npizzerias,best_sol_raw))
+                    
              
     return Solution(instance.npizzerias,best_sol_raw)
+
+
+
+
+# for _ in range(200000):
+
+    #     pizzerias = deepcopy(nos_pizzerias)
+    #     random.shuffle(pizzerias)
+
+    #     ordre_pizze = [pizzeria.id-1 for pizzeria in pizzerias]
+
+    #     instance_temps = deepcopy(instance_copy)
+
+    #     for pizzeria in pizzerias:
+    #         pizzeria.demande_journaliere = []
+    
+    #     sol, pizz = solution_initiale(pizzerias,N,T,M,Q)
+    #     #print(pizz[2].demande_journaliere)
+
+    #     for pizzeria in pizz:
+    #         nos_pizzerias[pizzeria.id-1].demande_journaliere = pizzeria.demande_journaliere
+    #     sol_raw = generate_raw_solution(sol,nos_pizzerias,M,N,T, mineX,mineY,ordre_pizze)
+
+    #     # if sol_raw != best_sol_raw:
+    #     #     print('oui')
+
+    #     cost,validity = instance_temps.solution_cost_and_validity(Solution(instance.npizzerias,sol_raw))
 
 
     
