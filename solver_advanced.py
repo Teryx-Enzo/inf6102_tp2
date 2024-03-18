@@ -21,84 +21,18 @@ class CustomPizzeria(Pizzeria):
 
         #On calcule la demande et on la renvoie si elle est positive
         demande = self.L+self.dailyConsumption-self.inventoryLevel
+        #print(self.inventoryLevel,self.dailyConsumption,demande, self.L)
+        if (demande > 0 and self.inventoryLevel-self.dailyConsumption+1*demande<=self.U) :
+            return 1*demande 
         
-        return demande if demande > 0 else 0
+        elif demande > 0:
+            return demande
+        else :
+            return 0
 
 
 
-def distance(point1,point2):
-    _, x1, y1 = point1
-    _, x2, y2 = point2
 
-    distance = np.sqrt((x1-x2)**2+(y1-y2)**2)
-
-
-    return distance
-
-def knn(x, X, k, **kwargs):
-    """
-    find indices of k-nearest neighbors of x in X
-    """
-    d = distance.cdist(x.reshape(1,-1), X).flatten()
-    return np.argpartition(d, k)[0]
-
-# def TSP_nn(points,mineX,mineY):
-    
-#     res = []
-#     point = [mineX,mineY]
-#     for i in range(len(points)):
-#         index = 
-
-def graph_complet(points):
-
-
-    G = nx.Graph()
-
-    for x in range(len(points)-1):
-
-        G.add_node(x)
-        G.add_edge(x,x+1,weight = distance(points[x],points[x+1]))
-
-    return G
-
-def TSP(points,mineX,mineY):
-    points = [(-1,mineX,mineY)]+points
-    G = graph_complet(points)
-
-    
-    min = nx.minimum_spanning_tree(G) 
-
-
-    impair_min = []
-
-    for node in min.nodes: 
-        if (min.degree(node) % 2 != 0):  
-
-            impair_min.append(node * -1)
-
-    impair = nx.complete_graph(impair_min)
-    couplage = nx.max_weight_matching(impair, maxcardinality=True)
-
-    liste_aretes = []
-
-    for i in couplage:
-        liste_aretes.append(i[0]*-1)
-        liste_aretes.append(i[1]*-1)
-
-
-    liste_ordre = []
-    IterZip = zip(*[iter(liste_aretes)] * 2)
-    for i in IterZip:
-        liste_ordre.append(i)
-    min.add_edges_from(liste_ordre)
-    
-
-    resultat = []
-    for i in nx.eulerian_circuit(min):
-        if i[0] not in resultat:
-            resultat.append(i[0])
-    
-    return resultat[1:]
 
 def solution_initiale(nos_pizzerias,N,T,M,Q):
      
@@ -117,8 +51,10 @@ def solution_initiale(nos_pizzerias,N,T,M,Q):
         
          
         for truck_id in range(M):
+            #print(truck_id)
             truck_capacity = Q
             
+            #On rempli chaque pizzeria pour petre sûr qu'il y aura assez de charbon pour la journée
             for pizzeria in pizzerias:
                     if np.count_nonzero(solution[t,:,pizzeria.id-1]) == 0:
 
@@ -131,15 +67,30 @@ def solution_initiale(nos_pizzerias,N,T,M,Q):
                                 solution[t,truck_id,pizzeria.id-1] = 1
                                 truck_capacity -= livraison
                                 pizzeria.inventoryLevel += livraison
+
+            #S'il reste de la place dans le camion, on rempli un peu plus une ou plusieurs pizzeria pour éviter d'avoir à les livrer à nouveau le lendemain
+            if truck_capacity > 0:
+                
+                for pizzeria in pizzerias:
+                    
+                    if solution[t,truck_id,pizzeria.id-1] == 1 :
                         
 
+                        ajout = min([truck_capacity, pizzeria.U-pizzeria.i])
+
+                        
+                        pizzeria.inventoryLevel += ajout
+                        pizzeria.demande_journaliere[t] += ajout
+                        truck_capacity -= ajout
                         
 
 
         for pizzeria in pizzerias:
              pizzeria.inventoryLevel -= pizzeria.dailyConsumption
 
-    return solution
+
+
+    return solution, pizzerias
 
 
 def generate_raw_solution(solution,pizzerias,M,N,T,mineX,mineY):
@@ -158,13 +109,6 @@ def generate_raw_solution(solution,pizzerias,M,N,T,mineX,mineY):
                     truck_route.append((pizzerias[id_pizz].id,pizzerias[id_pizz].demande_journaliere[t]))
                     truck_route_coordinate.append((id_pizz,pizzerias[id_pizz].x,pizzerias[id_pizz].y))
 
-            if len(truck_route)>2:
-                #print(truck_route)
-                #print(truck_route_coordinate)
-                ordered_indices = TSP(truck_route_coordinate,mineX,mineY)
-                
-                truck_route = [truck_route[i-1] for i in ordered_indices]
-                #print(truck_route)
 
             
             timestep.append(truck_route)
@@ -192,22 +136,32 @@ def solve(instance: Instance) -> Solution:
     
     
 
-    nos_pizzerias = [CustomPizzeria(p.id, p.x, p.y,  p.maxInventory, p.minInventory, p.inventoryLevel, p.dailyConsumption ,p.inventoryCost ) for _,p in list(instance.pizzeria_dict.items())]
+    nos_pizzerias = [CustomPizzeria(p.id, p.x, p.y,p.inventoryLevel,  p.maxInventory, p.minInventory,  p.dailyConsumption ,p.inventoryCost ) for _,p in list(instance.pizzeria_dict.items())]
     
-    pizzerias = nos_pizzerias.copy()
+    pizzerias = deepcopy(nos_pizzerias)
     #random.shuffle(nos_pizzerias)
 
     instance_copy = deepcopy(instance)
-    best_sol_raw = generate_raw_solution(solution_initiale(nos_pizzerias,N,T,M,Q),pizzerias,M,N,T, mineX,mineY)
+    sol,pizz  = solution_initiale(pizzerias,N,T,M,Q)
+    best_sol_raw = generate_raw_solution(sol,pizz,M,N,T, mineX,mineY)
     best_cost,validity = instance.solution_cost_and_validity(Solution(instance.npizzerias,best_sol_raw))
     
-    for _ in range(2000):
+    for _ in range(20000):
 
-        random.shuffle(nos_pizzerias)
+        pizzerias = deepcopy(nos_pizzerias)
+        random.shuffle(pizzerias)
 
         instance_temps = deepcopy(instance_copy)
+
+        for pizzeria in pizzerias:
+            pizzeria.demande_journaliere = []
     
-        sol_raw = generate_raw_solution(solution_initiale(nos_pizzerias,N,T,M,Q),pizzerias,M,N,T, mineX,mineY)
+        sol, pizz = solution_initiale(pizzerias,N,T,M,Q)
+        #print(pizz[2].demande_journaliere)
+
+        for pizzeria in pizz:
+            nos_pizzerias[pizzeria.id-1].demande_journaliere = pizzeria.demande_journaliere
+        sol_raw = generate_raw_solution(sol,nos_pizzerias,M,N,T, mineX,mineY)
 
         # if sol_raw != best_sol_raw:
         #     print('oui')
