@@ -180,95 +180,67 @@ def solve(instance: Instance) -> Solution:
     #nos_pizzerias = {id: CustomPizzeria(p.id, p.x, p.y, p.maxInventory, p.minInventory, p.inventoryLevel, p.dailyConsumption, p.inventoryCost) for id, p in instance.pizzeria_dict.items()}
     
     
-
+    # Liste des pizzerias qui servent à la contruction des solutions (on doit conserver l'ordre initial)
     nos_pizzerias = [CustomPizzeria(p.id, p.x, p.y,p.inventoryLevel,  p.maxInventory, p.minInventory,  p.dailyConsumption ,p.inventoryCost ) for _,p in list(instance.pizzeria_dict.items())]
     
+    # Copie des pizzerias et de l'instance pour pour la recherche de solution optimale
     pizzerias = deepcopy(nos_pizzerias)
     instance_copy = deepcopy(instance)
 
-
+    # On créé une solution initiale avec l'ordre décrit dans le fichier d'instance
     sol,pizz  = solution_initiale(pizzerias,N,T,M,Q)
     ordre_pizze = [pizzeria.id-1 for pizzeria in pizzerias]
     for pizzeria in pizz:
         nos_pizzerias[pizzeria.id-1].demande_journaliere = pizzeria.demande_journaliere
+
+    # On stocke la solution intiale et son score
     best_sol_raw = generate_raw_solution(sol,nos_pizzerias,M,N,T, mineX,mineY,ordre_pizze)
     best_cost,validity = instance_copy.solution_cost_and_validity(Solution(instance_copy.npizzerias,best_sol_raw))
 
-    for _ in range(200):
-        pizzerias = deepcopy(nos_pizzerias)
-        random.shuffle(pizzerias)
+    for _ in range(20):
 
-        for _ in range(5):
+        instance_temps = deepcopy(instance)
+        pizzerias = deepcopy(nos_pizzerias)
+        #restart aléatoire depuis la solution initiale
+        random.shuffle(pizzerias)
+        
+
+        best_cost_restart, best_sol_raw_restart = metric(pizzerias,instance_temps,N,T,M,Q,mineX,mineY,nos_pizzerias)
+
+
+        for _ in range(50):
+
+
             instance_temps = deepcopy(instance)
 
-            voisin = []
+            # On génère la liste de tous les voisins obtenus à partir des deux swaps depuis la solution courante
+            voisins = deux_swap(pizzerias)
 
-            for pizzeria in pizzerias:
-                pizzeria_copy = deepcopy(nos_pizzerias[pizzeria.id-1])
-                pizzeria_copy.demande_journaliere = []
-                voisin.append(pizzeria_copy)
+            # On évalue tous les voisins
+            metric_liste = [[voisin,*metric(voisin,instance_temps,N,T,M,Q,mineX,mineY,nos_pizzerias)] for voisin in voisins]
 
-            
-        
-            voisins = deux_swap(voisin)
-
-            metric_liste = [[voisin,*metric(voisin,instance,N,T,M,Q,mineX,mineY,nos_pizzerias)] for voisin in voisins]
-
-            
+            # On trie selon le score obtenu
             voisins_sorted = sorted(metric_liste, key = lambda x:x[1])
 
-            #print(voisins_sorted[0][1])
-            #print(metric(voisins_sorted[i,0],instance,N,T,M,Q,mineX,mineY,nos_pizzerias))
             
-            if voisins_sorted[0][1] < best_cost:
-                    print(voisins_sorted[0][1])
-                    best_cost  = voisins_sorted[0][1]
-                    best_sol_raw = voisins_sorted[0][2]
+            if voisins_sorted[0][1] < best_cost_restart:
+                    print("Amelioration dans voisinnage",voisins_sorted[0][1])
+                    best_cost_restart  = voisins_sorted[0][1]
+                    best_sol_raw_restart = voisins_sorted[0][2]
                     
+                    # On choisi comme solution courante le meilleur voisin
                     pizzerias = voisins_sorted[0][0]
-                    # voisin = []
-
                     
-                    # for pizzeria in pizzerias:
-                    #     pizzeria_copy = deepcopy(nos_pizzerias[pizzeria.id-1])
-                    #     pizzeria_copy.demande_journaliere = []
-                    #     voisin.append(pizzeria_copy)
-                    # sol,pizz  = solution_initiale(voisin,N,T,M,Q)
-                    # ordre_pizze = [pizzeria.id-1 for pizzeria in voisin]
-                    # for pizzeria in pizz:
-                    #     nos_pizzerias[pizzeria.id-1].demande_journaliere = pizzeria.demande_journaliere
-                    # best_sol_raw = generate_raw_solution(sol,nos_pizzerias,M,N,T, mineX,mineY,ordre_pizze)
-                    #best_cost,validity = instance_temps.solution_cost_and_validity(Solution(instance.npizzerias,best_sol_raw))
+        if best_cost_restart < best_cost:
                     
+                    print("Amelioration dans le restart",best_cost_restart)
+                    best_cost  = best_cost_restart
+                    best_sol_raw = best_sol_raw_restart
+                       
              
     return Solution(instance.npizzerias,best_sol_raw)
 
 
-
-
-# for _ in range(200000):
-
-    #     pizzerias = deepcopy(nos_pizzerias)
-    #     random.shuffle(pizzerias)
-
-    #     ordre_pizze = [pizzeria.id-1 for pizzeria in pizzerias]
-
-    #     instance_temps = deepcopy(instance_copy)
-
-    #     for pizzeria in pizzerias:
-    #         pizzeria.demande_journaliere = []
-    
-    #     sol, pizz = solution_initiale(pizzerias,N,T,M,Q)
-    #     #print(pizz[2].demande_journaliere)
-
-    #     for pizzeria in pizz:
-    #         nos_pizzerias[pizzeria.id-1].demande_journaliere = pizzeria.demande_journaliere
-    #     sol_raw = generate_raw_solution(sol,nos_pizzerias,M,N,T, mineX,mineY,ordre_pizze)
-
-    #     # if sol_raw != best_sol_raw:
-    #     #     print('oui')
-
-    #     cost,validity = instance_temps.solution_cost_and_validity(Solution(instance.npizzerias,sol_raw))
 
 
     
