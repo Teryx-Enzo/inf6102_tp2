@@ -1,99 +1,96 @@
 from utils import *
 import random
 import numpy as np
-from scipy.spatial.distance import cdist
-import networkx as nx
-import matplotlib.pyplot as plt
-
 from copy import deepcopy
-class CustomPizzeria(Pizzeria):
 
-    """ You are completely free to extend classes defined in utils,
-        this might prove useful or enhance code readability
+
+class CustomPizzeria(Pizzeria):
+    """ 
+    Extension de la classe Pizzeria avec une liste de demandes journalières.
     """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.demande_journaliere = []
-
+        self.demande_journaliere = [] # TODO : changer par livraison ???
 
     def calculer_demande(self):
-
-        #On calcule la demande et on la renvoie si elle est positive
-        demande = self.L+self.dailyConsumption-self.inventoryLevel
-        #print(self.inventoryLevel,self.dailyConsumption,demande, self.L)
-        if (demande > 0 and self.inventoryLevel-self.dailyConsumption+1*demande<=self.U) :
-            return 1*demande 
+        # On calcule la demande et on la renvoie si elle est positive
+        demande = self.L + self.dailyConsumption - self.inventoryLevel
         
-        elif demande > 0:
+        if demande > 0:
             return demande
         else :
             return 0
 
 
+def solution_initiale(Pizzerias: List[CustomPizzeria], N: int, T: int, M: int, Q: int) -> np.ndarray:
+    """
+    Calcule une solution initiale gloutonne.
 
-
-
-def solution_initiale(nos_pizzerias,N,T,M,Q):
-     
+    Args:
+        Pizzerias (List[CustomPizzeria]) : les pizzerias de l'instance.
+        N (int) : le nombre de pizzerias de l'instance.
+        T (int) : le nombre de jours de l'instance.
+        M (int) : le nombre de camions de l'instance.
+        Q (int) : la capacité de chaque camion de l'instance.
+    
+    Returns:
+        solution (np.ndarray) : l'assignation gloutonne jour par jour des camions aux pizzerias.
+    """ 
 
     solution = np.zeros((T,M,N))
-    pizzerias = nos_pizzerias.copy()
-
+    pizzerias = Pizzerias.copy()
 
     for t in range(T):
-
 
         for pizzeria in pizzerias:
             demande_jour = pizzeria.calculer_demande()
             pizzeria.demande_journaliere.append(demande_jour)
-        
-        
          
         for truck_id in range(M):
-            #print(truck_id)
             truck_capacity = Q
             
-            #On rempli chaque pizzeria pour petre sûr qu'il y aura assez de charbon pour la journée
+            # On remplit chaque pizzeria dans l'ordre pour être sûr qu'il y aura assez de charbon pour la journée.
             for pizzeria in pizzerias:
-                    if np.count_nonzero(solution[t,:,pizzeria.id-1]) == 0:
+                if np.count_nonzero(solution[t, :, pizzeria.id-1]) == 0: # Si la pizzeria n'est pas encore desservie
+                    demande = pizzeria.demande_journaliere[t]
 
-                        demande = pizzeria.demande_journaliere[t]
+                    if demande:
+                        livraison = demande if truck_capacity > demande else 0
 
-                        if demande:
-                            livraison = demande if  truck_capacity > demande else 0
+                        if livraison :
+                            solution[t, truck_id, pizzeria.id-1] = 1
+                            truck_capacity -= livraison
+                            pizzeria.inventoryLevel += livraison
 
-                            if livraison :
-                                solution[t,truck_id,pizzeria.id-1] = 1
-                                truck_capacity -= livraison
-                                pizzeria.inventoryLevel += livraison
-
-            #S'il reste de la place dans le camion, on rempli un peu plus une ou plusieurs pizzeria pour éviter d'avoir à les livrer à nouveau le lendemain
+            # S'il reste de la place dans le camion, on remplit un peu plus une ou plusieurs pizzeria(s) pour
+            # éviter d'avoir à les livrer à nouveau le lendemain.
             if truck_capacity > 0:
-                
                 for pizzeria in pizzerias:
-                    
-                    if solution[t,truck_id,pizzeria.id-1] == 1 :
+                    if solution[t, truck_id, pizzeria.id-1] == 1:
                         
-
                         ajout = min([truck_capacity, pizzeria.U-pizzeria.i])
 
-                        
                         pizzeria.inventoryLevel += ajout
                         pizzeria.demande_journaliere[t] += ajout
                         truck_capacity -= ajout
-                        
-
-
+        
         for pizzeria in pizzerias:
              pizzeria.inventoryLevel -= pizzeria.dailyConsumption
-
-
 
     return solution, pizzerias
 
 
-def generate_raw_solution(solution,pizzerias,M,N,T,mineX,mineY,ordre_pizze):
+def generate_raw_solution(solution, pizzerias, M, N, T, mineX, mineY, ordre_pizze):
+    """
+    e
+    
+    Args:
+        D
+    
+    Returns:
+        D
+    """
 
     raw_solution = []
     
@@ -140,6 +137,15 @@ def deux_swap(pizzerias):
 
 
 def metric(pizzerias,instance,N,T,M,Q,mineX,mineY,nos_pizzerias):
+    """
+    e
+    
+    Args:
+        D
+    
+    Returns:
+        D
+    """
     
     instance_copy = deepcopy(instance)
     voisin = []
@@ -239,6 +245,3 @@ def solve(instance: Instance) -> Solution:
                        
              
     return Solution(instance.npizzerias,best_sol_raw)
-
-
-
