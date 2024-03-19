@@ -185,6 +185,8 @@ def solve(instance: Instance) -> Solution:
     mineX, mineY = instance.mine.x, instance.mine.y
     #nos_pizzerias = {id: CustomPizzeria(p.id, p.x, p.y, p.maxInventory, p.minInventory, p.inventoryLevel, p.dailyConsumption, p.inventoryCost) for id, p in instance.pizzeria_dict.items()}
     
+    # valeur de seuil pour le recuit simulé
+    epsilon = 0.05
     
     # Liste des pizzerias qui servent à la contruction des solutions (on doit conserver l'ordre initial)
     nos_pizzerias = [CustomPizzeria(p.id, p.x, p.y,p.inventoryLevel,  p.maxInventory, p.minInventory,  p.dailyConsumption ,p.inventoryCost ) for _,p in list(instance.pizzeria_dict.items())]
@@ -229,7 +231,7 @@ def solve(instance: Instance) -> Solution:
             voisins_sorted = sorted(metric_liste, key = lambda x:x[1])
 
             
-            if voisins_sorted[0][1] < best_cost_restart:
+            if voisins_sorted[0][1] < best_cost_restart or random.random()<epsilon:
                     print("Amelioration dans voisinnage",voisins_sorted[0][1])
                     best_cost_restart  = voisins_sorted[0][1]
                     best_sol_raw_restart = voisins_sorted[0][2]
