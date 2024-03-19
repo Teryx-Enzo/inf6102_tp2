@@ -242,17 +242,3 @@ def solve(instance: Instance) -> Solution:
 
 
 
-
-    
-if __name__ == "__main__":
-
-    points = [(2,0,0),(3,2,3),(4,3,2),(5,0,1),(6,5,1) ]
-
-    puntos = []
-    for i,x,y in points:
-        puntos.append((i,float(x), float(y)))
-
-    for i in range(10):
-        res = TSP(puntos,2,0)
-        print(res)
-        puntos = [puntos[i-1] for i in res]
