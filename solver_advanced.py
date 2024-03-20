@@ -15,12 +15,14 @@ class CustomPizzeria(Pizzeria):
 
     def calculer_demande(self):
         # On calcule la demande et on la renvoie si elle est positive
-        demande = self.L + self.dailyConsumption - self.inventoryLevel
+        demande = max(0, self.L + self.dailyConsumption - self.inventoryLevel)
+
+        return demande
         
-        if demande > 0:
-            return demande
-        else :
-            return 0
+        # if demande > 0:
+        #     return demande
+        # else :
+        #     return 0
 
 
 def solution_initiale(Pizzerias: List[CustomPizzeria], N: int, T: int, M: int, Q: int) -> np.ndarray:
@@ -130,7 +132,7 @@ def deux_swap(pizzerias):
     for i in range(n):
         for j in range(i+1,n):
             neigh = deepcopy(pizzerias)
-            neigh[i],neigh[j] = pizzerias[j], pizzerias[i]
+            neigh[i], neigh[j] = pizzerias[j], pizzerias[i]
             deux_swap_neigh.append(neigh)
 
     return deux_swap_neigh
@@ -151,19 +153,20 @@ def metric(pizzerias,instance,N,T,M,Q,mineX,mineY,nos_pizzerias):
     voisin = []
     
     for pizzeria in pizzerias:
-                pizzeria_copy = deepcopy(nos_pizzerias[pizzeria.id-1])
-                pizzeria_copy.demande_journaliere = []
-                voisin.append(pizzeria_copy)
+        pizzeria_copy = deepcopy(nos_pizzerias[pizzeria.id-1])
+        pizzeria_copy.demande_journaliere = []
+        voisin.append(pizzeria_copy)
 
-    sol,pizz  = solution_initiale(voisin,N,T,M,Q)
+    sol, pizz  = solution_initiale(voisin,N,T,M,Q)
     ordre_pizze = [pizzeria.id-1 for pizzeria in voisin]
 
     for pizzeria in pizz:
         nos_pizzerias[pizzeria.id-1].demande_journaliere = pizzeria.demande_journaliere
+
     sol_raw = generate_raw_solution(sol,nos_pizzerias,M,N,T, mineX,mineY,ordre_pizze)
 
     
-    cost,validity = instance_copy.solution_cost_and_validity(Solution(instance_copy.npizzerias,sol_raw))
+    cost, _ = instance_copy.solution_cost_and_validity(Solution(instance_copy.npizzerias,sol_raw))
 
 
     return cost, sol_raw
@@ -183,10 +186,6 @@ def solve(instance: Instance) -> Solution:
 
 
     mineX, mineY = instance.mine.x, instance.mine.y
-    #nos_pizzerias = {id: CustomPizzeria(p.id, p.x, p.y, p.maxInventory, p.minInventory, p.inventoryLevel, p.dailyConsumption, p.inventoryCost) for id, p in instance.pizzeria_dict.items()}
-    
-    # valeur de seuil pour le recuit simulé
-    epsilon = 0.05
     
     # Liste des pizzerias qui servent à la contruction des solutions (on doit conserver l'ordre initial)
     nos_pizzerias = [CustomPizzeria(p.id, p.x, p.y,p.inventoryLevel,  p.maxInventory, p.minInventory,  p.dailyConsumption ,p.inventoryCost ) for _,p in list(instance.pizzeria_dict.items())]
@@ -196,7 +195,7 @@ def solve(instance: Instance) -> Solution:
     instance_copy = deepcopy(instance)
 
     # On créé une solution initiale avec l'ordre décrit dans le fichier d'instance
-    sol,pizz  = solution_initiale(pizzerias,N,T,M,Q)
+    sol, pizz  = solution_initiale(pizzerias,N,T,M,Q)
     ordre_pizze = [pizzeria.id-1 for pizzeria in pizzerias]
     for pizzeria in pizz:
         nos_pizzerias[pizzeria.id-1].demande_journaliere = pizzeria.demande_journaliere
@@ -213,11 +212,12 @@ def solve(instance: Instance) -> Solution:
         random.shuffle(pizzerias)
         
 
-        best_cost_restart, best_sol_raw_restart = metric(pizzerias,instance_temps,N,T,M,Q,mineX,mineY,nos_pizzerias)
+        current_cost, current_sol_raw = metric(pizzerias,instance_temps,N,T,M,Q,mineX,mineY,nos_pizzerias)
+        best_cost_restart, best_sol_raw_restart = current_cost, current_sol_raw
 
+        t = 1000
 
-        for _ in range(50):
-
+        for _ in range(400):
 
             instance_temps = deepcopy(instance)
 
@@ -225,19 +225,34 @@ def solve(instance: Instance) -> Solution:
             voisins = deux_swap(pizzerias)
 
             # On évalue tous les voisins
-            metric_liste = [[voisin,*metric(voisin,instance_temps,N,T,M,Q,mineX,mineY,nos_pizzerias)] for voisin in voisins]
+            #metric_liste = [[voisin,*metric(voisin,instance_temps,N,T,M,Q,mineX,mineY,nos_pizzerias)] for voisin in voisins]
 
             # On trie selon le score obtenu
-            voisins_sorted = sorted(metric_liste, key = lambda x:x[1])
+            #voisins_sorted = sorted(metric_liste, key = lambda x:x[1])
 
+            voisin = random.choice(voisins)
+
+            cost, sol_row = metric(voisin, instance_temps, N, T, M, Q, mineX, mineY, nos_pizzerias)
+
+            delta = cost - current_cost
+
+            # if delta <= 0:
+            #     print(delta)
+            # else:
+            #     print(delta, np.exp(-delta/t))
+
+            if delta <= 0 or np.random.rand() < np.exp(-delta/t):
+                current_cost, current_sol_raw = cost, sol_row
             
-            if voisins_sorted[0][1] < best_cost_restart or random.random()<epsilon:
-                    print("Amelioration dans voisinnage",voisins_sorted[0][1])
-                    best_cost_restart  = voisins_sorted[0][1]
-                    best_sol_raw_restart = voisins_sorted[0][2]
-                    
-                    # On choisi comme solution courante le meilleur voisin
-                    pizzerias = voisins_sorted[0][0]
+            if current_cost < best_cost_restart:
+                print("Amelioration dans voisinnage", current_cost)
+                best_cost_restart    = current_cost
+                best_sol_raw_restart = current_sol_raw
+                
+                # On choisi comme solution courante le meilleur voisin
+                pizzerias = voisin
+            
+            t *= 0.99
                     
         if best_cost_restart < best_cost:
                     
