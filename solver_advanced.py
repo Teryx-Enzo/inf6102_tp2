@@ -2,6 +2,7 @@ from utils import *
 import random
 import numpy as np
 from copy import deepcopy
+from time import time
 
 
 class CustomPizzeria(Pizzeria):
@@ -184,8 +185,19 @@ def solve(instance: Instance) -> Solution:
     """
     Q, M, N, T = instance.Q, instance.M, instance.npizzerias, instance.T
 
+    list_costs = []
+
 
     mineX, mineY = instance.mine.x, instance.mine.y
+
+    # Métriques de temps d'exécution
+    t0 = time()
+    iteration_duration = 0
+
+    if ('instanceE' in instance.filepath) or ('instanceD' in instance.filepath):
+        credit_temps = 600
+    else:
+        credit_temps = 300
     
     # Liste des pizzerias qui servent à la contruction des solutions (on doit conserver l'ordre initial)
     nos_pizzerias = [CustomPizzeria(p.id, p.x, p.y,p.inventoryLevel,  p.maxInventory, p.minInventory,  p.dailyConsumption ,p.inventoryCost ) for _,p in list(instance.pizzeria_dict.items())]
@@ -204,7 +216,9 @@ def solve(instance: Instance) -> Solution:
     best_sol_raw = generate_raw_solution(sol,nos_pizzerias,M,N,T, mineX,mineY,ordre_pizze)
     best_cost,validity = instance_copy.solution_cost_and_validity(Solution(instance_copy.npizzerias,best_sol_raw))
 
-    for _ in range(20):
+    while ((time()-t0) + iteration_duration) < credit_temps-5:
+
+        t1 = time()
 
         instance_temps = deepcopy(instance)
         pizzerias = deepcopy(nos_pizzerias)
@@ -217,7 +231,7 @@ def solve(instance: Instance) -> Solution:
 
         t = 1000
 
-        for _ in range(400):
+        for _ in range(100):
 
             instance_temps = deepcopy(instance)
 
@@ -234,6 +248,8 @@ def solve(instance: Instance) -> Solution:
 
             cost, sol_row = metric(voisin, instance_temps, N, T, M, Q, mineX, mineY, nos_pizzerias)
 
+            
+
             delta = cost - current_cost
 
             # if delta <= 0:
@@ -241,11 +257,13 @@ def solve(instance: Instance) -> Solution:
             # else:
             #     print(delta, np.exp(-delta/t))
 
-            if delta <= 0 or np.random.rand() < np.exp(-delta/t):
+            if delta <= 0 : #or np.random.rand() < np.exp(-delta/t):
                 current_cost, current_sol_raw = cost, sol_row
             
+            list_costs.append(current_cost)
+
             if current_cost < best_cost_restart:
-                print("Amelioration dans voisinnage", current_cost)
+                #print("Amelioration dans voisinnage", current_cost)
                 best_cost_restart    = current_cost
                 best_sol_raw_restart = current_sol_raw
                 
@@ -259,6 +277,10 @@ def solve(instance: Instance) -> Solution:
                     print("Amelioration dans le restart",best_cost_restart)
                     best_cost  = best_cost_restart
                     best_sol_raw = best_sol_raw_restart
-                       
+        iteration_duration = time() - t1
+    
+    # plt.figure()
+    # plt.plot(list_costs)
+    # plt.show()
              
     return Solution(instance.npizzerias,best_sol_raw)
