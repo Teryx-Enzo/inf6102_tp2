@@ -48,8 +48,8 @@ if __name__ == '__main__':
     solving_time = round((time.time() - start_time) / 60,2)
 
     # You can disable the display if you do not want to generate the visualization
-    if args.viz:
-        instance.visualize(solution)
+    # if args.viz:
+    #     instance.visualize(solution)
     #
     instance.generate_file(solution)
     cost = instance.solution_cost_and_validity(solution)
